@@ -6,17 +6,17 @@ on:
       - main
       - develop
       - feature/recommendationservice
-    paths:
-      - 'src/**'
-      - '.github/workflows/recommendationservice.yaml'
+    # paths:
+    #   - 'src/**'
+    #   - '.github/workflows/recommendationservice.yaml'
   pull_request:
     branches:
       - main
       - develop
       - feature/recommendationservice
-    paths:
-      - 'src/**'
-      - '.github/workflows/recommendationservice.yaml'
+    # paths:
+    #   - 'src/**'
+    #   - '.github/workflows/recommendationservice.yaml'
 
 permissions:
   contents: write
