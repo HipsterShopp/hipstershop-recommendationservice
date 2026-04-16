@@ -67,4 +67,3 @@ jobs:
 
     secrets:
       SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
-
