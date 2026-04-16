@@ -5,25 +5,25 @@ on:
     branches:
       - main
       - develop
+      - feature/recommendationservice
     paths:
       - 'src/**'
       - '.github/workflows/recommendationservice.yaml'
-      - '.github/workflows/template.yaml'
   pull_request:
     branches:
       - main
       - develop
+      - feature/recommendationservice
     paths:
       - 'src/**'
       - '.github/workflows/recommendationservice.yaml'
-      - '.github/workflows/template.yaml'
 
 permissions:
   contents: write
 
 jobs:
-  call-template:
-    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/template.yaml@main
+  validation:
+    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/validation-ci.yaml@feature/new-templates-ci
     with:
       github_event_name: ${{ github.event_name }}
       service_name: recommendationservice
@@ -33,7 +33,38 @@ jobs:
     secrets:
       SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+  
+  build_scan:
+    needs: validation
+    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/build-scan-ci.yaml@feature/new-templates-ci
+    with:
+      github_event_name: ${{ github.event_name }}
+      service_name: recommendationservice
+      service_path: src/
+      runtime: python
+      snyk_status: ${{ needs.validation.outputs.snyk_status }}
+    secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+  notify:
+    needs: [validation, build_scan]
+    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/notify-ci.yaml@feature/new-templates-ci
+    with:
+      github_event_name: ${{ github.event_name }}
+      service_name: recommendationservice
+      service_path: src/
+      runtime: python
+
+      sonar_status: ${{ needs.validation.outputs.sonar_status }}
+      snyk_status: ${{ needs.validation.outputs.snyk_status }}
+
+      generate_tag_result: ${{ needs.build_scan.outputs.generate_tag_result }}
+      build_result: ${{ needs.build_scan.outputs.build_result }}
+      trivy_result: ${{ needs.build_scan.outputs.trivy_result }}
+      tag_status: ${{ needs.build_scan.outputs.tag_status }}
+      push_status: ${{ needs.build_scan.outputs.push_status }}
+
+    secrets:
       SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
