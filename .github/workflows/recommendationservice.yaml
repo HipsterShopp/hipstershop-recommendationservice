@@ -1,6 +1,5 @@
 name: recommendationservice CI
 
-
 on:
   push:
     branches:
