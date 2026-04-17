@@ -1,69 +1,81 @@
 name: recommendationservice CI
-
+ 
+run-name: "recommendationservice — ${{ github.event.head_commit.message || github.event.pull_request.title }} (${{ github.sha }})"
+ 
 on:
   push:
-    branches:
-      - main
-      - develop
-      - feature/recommendationservice
-    # paths:
-    #   - 'src/**'
-    #   - '.github/workflows/recommendationservice.yaml'
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - '.github/workflows/recommendationservice.yaml'
   pull_request:
-    branches:
-      - main
-      - develop
-    # paths:
-    #   - 'src/**'
-    #   - '.github/workflows/recommendationservice.yaml'
-
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - '.github/workflows/recommendationservice.yaml'
+ 
 permissions:
   contents: write
-
+ 
 jobs:
-  validation:
-    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/validation-ci.yaml@feature/new-templates-ci
+ 
+  sonar-and-snyk:
+    if: github.event_name == 'pull_request'
+    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/sonar-and-snyk.yaml@main
     with:
-      github_event_name: ${{ github.event_name }}
       service_name: recommendationservice
       service_path: src/
-      runtime: python
-      python-version: "3.11"
+      runtime: python  
     secrets:
-      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-  
-  build_scan:
-    needs: validation
-    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/build-scan-ci.yaml@feature/new-templates-ci
+      SNYK_TOKEN:      ${{ secrets.SNYK_TOKEN }}
+      SONAR_TOKEN:     ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL:  ${{ secrets.SONAR_HOST_URL }}
+ 
+  generate-tag-and-build-image:
+    needs: [sonar-and-snyk]
+    if: |
+      always() &&
+      (
+        (github.event_name == 'pull_request' && needs.sonar-and-snyk.result == 'success') ||
+        github.event_name == 'push'
+      )
+    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/generate-tag-and-build-image-trivy.yaml@main
     with:
-      github_event_name: ${{ github.event_name }}
       service_name: recommendationservice
       service_path: src/
-      runtime: python
-      snyk_status: ${{ needs.validation.outputs.snyk_status }}
+      run_trivy: ${{ github.event_name == 'pull_request' }}
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-
-  notify:
-    needs: [validation, build_scan]
-    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/notify-ci.yaml@feature/new-templates-ci
+      DOCKERHUB_TOKEN:    ${{ secrets.DOCKERHUB_TOKEN }}
+ 
+  push:
+    needs: [generate-tag-and-build-image]
+    if: |
+      always() &&
+      github.event_name == 'push' &&
+      needs.generate-tag-and-build-image.result == 'success'
+    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/push.yaml@main
     with:
-      github_event_name: ${{ github.event_name }}
       service_name: recommendationservice
-      service_path: src/
-      runtime: python
-
-      sonar_status: ${{ needs.validation.outputs.sonar_status }}
-      snyk_status: ${{ needs.validation.outputs.snyk_status }}
-
-      generate_tag_result: ${{ needs.build_scan.outputs.generate_tag_result }}
-      build_result: ${{ needs.build_scan.outputs.build_result }}
-      trivy_result: ${{ needs.build_scan.outputs.trivy_result }}
-      tag_status: ${{ needs.build_scan.outputs.tag_status }}
-      push_status: ${{ needs.build_scan.outputs.push_status }}
-
+      git_tag:     ${{ needs.generate-tag-and-build-image.outputs.tag }}
+      tag_exists:  ${{ needs.generate-tag-and-build-image.outputs.tag_exists }}
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN:    ${{ secrets.DOCKERHUB_TOKEN }}
+ 
+ 
+  notify:
+    needs: [sonar-and-snyk, generate-tag-and-build-image, push]
+    if: always()
+    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/notify.yaml@main
+    with:
+      service_name:        recommendationservice
+      git_tag:             ${{ needs.generate-tag-and-build-image.outputs.tag || 'N/A' }}
+      sonarqube_result:    ${{ needs.sonar-and-snyk.outputs.sonarqube_result || 'skipped' }}
+      snyk_result:         ${{ needs.sonar-and-snyk.outputs.snyk_result || 'skipped' }}
+      generate_tag_result: ${{ needs.generate-tag-and-build-image.result || 'skipped' }}
+      build_result:        ${{ needs.generate-tag-and-build-image.outputs.build_result || 'skipped' }}
+      trivy_result:        ${{ needs.generate-tag-and-build-image.outputs.trivy_result || 'skipped' }}
+      push_result:         ${{ needs.push.outputs.push_result || 'skipped' }}
     secrets:
       SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
