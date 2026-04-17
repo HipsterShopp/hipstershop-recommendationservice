@@ -21,7 +21,7 @@ jobs:
  
   sonar-and-snyk:
     if: github.event_name == 'pull_request'
-    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/sonar-and-snyk.yaml@main
+    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/sonar-and-snyk.yaml@feature/loose-coupling
     with:
       service_name: recommendationservice
       service_path: src/
@@ -39,7 +39,7 @@ jobs:
         (github.event_name == 'pull_request' && needs.sonar-and-snyk.result == 'success') ||
         github.event_name == 'push'
       )
-    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/generate-tag-and-build-image-trivy.yaml@main
+    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/generate-tag-and-build-image-trivy.yaml@feature/loose-coupling
     with:
       service_name: recommendationservice
       service_path: src/
@@ -54,7 +54,7 @@ jobs:
       always() &&
       github.event_name == 'push' &&
       needs.generate-tag-and-build-image.result == 'success'
-    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/push.yaml@main
+    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/push.yaml@feature/loose-coupling
     with:
       service_name: recommendationservice
       git_tag:     ${{ needs.generate-tag-and-build-image.outputs.tag }}
@@ -62,12 +62,26 @@ jobs:
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN:    ${{ secrets.DOCKERHUB_TOKEN }}
- 
+      
+  update-helm-values:
+    needs: [push]
+    if: |
+      always() &&
+      github.event_name == 'push' &&
+      github.ref_name == 'main' &&
+      needs.push.result == 'success'
+    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/helm-updater-job.yaml@feature/loose-coupling
+    with:
+      service_name: recommendationservice
+      image_tag: ${{ needs.push.outputs.tag }}
+      helm_values_path: hipstershop-micro-apps/recommendationservice/values.yaml
+    secrets:
+      HELM_CHARTS_TOKEN: ${{ secrets.HELM_CHARTS_TOKEN }}
  
   notify:
     needs: [sonar-and-snyk, generate-tag-and-build-image, push]
     if: always()
-    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/notify.yaml@main
+    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/notify.yaml@feature/loose-coupling
     with:
       service_name:        recommendationservice
       git_tag:             ${{ needs.generate-tag-and-build-image.outputs.tag || 'N/A' }}
