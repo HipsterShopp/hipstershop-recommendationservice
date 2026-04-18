@@ -80,7 +80,7 @@ jobs:
       HELM_CHARTS_TOKEN: ${{ secrets.HELM_CHARTS_TOKEN }}
  
   notify:
-    needs: [sonar-and-snyk, generate-tag-and-build-image, push]
+    needs: [sonar-and-snyk, generate-tag-and-build-image, push, update-helm-values]
     if: always()
     uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/notify.yaml@main
     with:
