@@ -70,7 +70,7 @@ jobs:
       github.event_name != 'pull_request' &&
       github.ref_name == 'develop' &&
       needs.push.result == 'success'
-    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/helm-updater-job.yaml@feature/loose-coupling
+    uses: HipsterShopp/hipstershop-shared-workflows/.github/workflows/helm-updater-job.yaml@develop
     with:
       service_name: recommendationservice
       image_tag: ${{ needs.generate-tag-and-build-image.outputs.tag }}
